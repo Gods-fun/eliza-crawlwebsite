@@ -374,7 +374,7 @@ export class TwitterPostClient {
         console.log("generate tweet content response:\n" + response);
 
         // First clean up any markdown and newlines
-        let cleanedResponse = response
+        const cleanedResponse = response
             .replace(/```json\s*/g, '')  // Remove ```json
             .replace(/```\s*/g, '')      // Remove any remaining ```
             .replaceAll(/\\n/g, "\n")

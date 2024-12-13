@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+rm $HOME/.selenium/log/selenium.log
+java -jar $HOME/.selenium/bin/selenium-server-standalone-2.35.0.jar -Dwebdriver.chrome.driver=$HOME/.selenium/bin/chromedriververbose -log $HOME/.selenium/log/selenium.log

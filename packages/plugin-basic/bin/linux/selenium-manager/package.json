@@ -1,0 +1,37 @@
+{
+  "name": "selenium-manager",
+  "version": "0.4.3",
+  "description": "A manager for the selenium binary and its ecosystem",
+  "main": " ",
+  "scripts": {
+    "build": "coffee --bare --compile --output . src/ && coffee build/scripts.coffee",
+    "prepublish": "npm run-script build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/goodeggs/selenium-manager"
+  },
+  "keywords": [
+    "selenium",
+    "selenium-webdriver",
+    "chromedriver",
+    "process-management"
+  ],
+  "author": "Max Edmands",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/goodeggs/selenium-manager/issues"
+  },
+  "dependencies": {
+    "mkdirp": "~0.3.5",
+    "async": "~0.2.10"
+  },
+  "devDependencies": {
+    "coffee-script": "~1.6.3"
+  },
+  "bin": {
+    "selenium-download": "./bin/selenium-download",
+    "selenium-serve": "./bin/selenium-serve",
+    "selenium-manage": "./bin/selenium-manage"
+  }
+}
