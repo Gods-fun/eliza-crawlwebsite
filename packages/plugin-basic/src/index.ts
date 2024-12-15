@@ -1,6 +1,7 @@
 import { Plugin } from "@ai16z/eliza";
 import { helloWorldAction } from "./actions/helloWorldAction.ts";
 import {seleniumProfilesAction} from "./actions/seleniumProfilesAction.ts"
+import {seleniumflexibleAction} from "./actions/seleniumflexibleAction.ts"
 export * as actions from "./actions";
 export * as evaluators from "./evaluators";
 export * as providers from "./providers";
@@ -10,7 +11,8 @@ export const basicPlugin: Plugin = {
     description: "Agent bootstrap with basic actions and evaluators",
     actions: [
       helloWorldAction,
-      seleniumProfilesAction,
+      seleniumflexibleAction,
+      seleniumProfilesAction
     ],
     evaluators: [],
     providers: [],
