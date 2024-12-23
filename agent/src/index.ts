@@ -27,7 +27,7 @@ import {
 import { zgPlugin } from "@ai16z/plugin-0g";
 import createGoatPlugin from "@ai16z/plugin-goat";
 import { bootstrapPlugin } from "@ai16z/plugin-bootstrap";
-import { basicPlugin } from "@ai16z/plugin-basic";
+import { seleniumPlugin } from "@ai16z/plugin-selenium";
 // import { intifacePlugin } from "@ai16z/plugin-intiface";
 import {
     coinbaseCommercePlugin,
@@ -72,6 +72,7 @@ export function parseArguments(): {
     characters?: string;
 } {
     try {
+        elizaLogger.log("parseArguments");
         return yargs(process.argv.slice(3))
             .option("character", {
                 type: "string",
@@ -427,7 +428,7 @@ export async function createAgent(
         evaluators: [],
         character,
         plugins: [
-            basicPlugin,
+            seleniumPlugin,
             bootstrapPlugin,
             getSecret(character, "CONFLUX_CORE_PRIVATE_KEY")
                 ? confluxPlugin
@@ -540,9 +541,12 @@ async function startAgent(character: Character, directClient) {
 
 const startAgents = async () => {
     const directClient = await DirectClientInterface.start();
+    elizaLogger.log("directClient complete");
     const args = parseArguments();
+    elizaLogger.log("directClient complete");
 
     let charactersArg = args.characters || args.character;
+    elizaLogger.log("charactersArg complete"+charactersArg);
 
     let characters = [defaultCharacter];
 
