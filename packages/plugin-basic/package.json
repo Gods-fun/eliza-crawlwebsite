@@ -1,5 +1,5 @@
 {
-    "name": "@ai16z/plugin-basic",
+    "name": "@ai16z/plugin-selenium",
     "version": "0.1.5-alpha.3",
     "main": "dist/index.js",
     "type": "module",
