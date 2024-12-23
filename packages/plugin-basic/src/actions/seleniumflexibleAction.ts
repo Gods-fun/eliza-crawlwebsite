@@ -121,44 +121,6 @@ const dataPatterns: { [key: string]: DataPattern } = {
             ],
             attribute: 'datetime'
         }
-    },
-    restaurants: {
-        name: "Restaurants",
-        patterns: [
-            /(?:restaurant|café|bistro|diner|pizzeria|eatery)/i
-        ],
-        config: {
-            selectors: [
-                '[itemtype*="Restaurant"]',
-                '.restaurant-name',
-                '.venue-name',
-                '[class*="restaurant"]',
-                '[class*="dining"]',
-                '.menu-item',
-                '.dish',
-                '[class*="food"]',
-                '[class*="hours"]',
-                '[class*="location"]',
-                '[class*="address"]',
-                '[class*="rating"]',
-                '[class*="review"]',
-                '[class*="price"]',
-                '[itemtype*="Restaurant"]',
-                '[itemprop="servesCuisine"]',
-                '[itemprop="address"]',
-                '[itemprop="telephone"]'
-            ],
-            transform: (value) => {
-                return {
-                    name: value.match(/(?:name|title):\s*(.*)/i)?.[1],
-                    cuisine: value.match(/cuisine:\s*(.*)/i)?.[1],
-                    address: value.match(/address:\s*(.*)/i)?.[1],
-                    hours: value.match(/hours:\s*(.*)/i)?.[1],
-                    phone: value.match(/(?:phone|tel):\s*(.*)/i)?.[1],
-                    price: value.match(/price:\s*(.*)/i)?.[1]
-                };
-            }
-        }
     }
 };
 
@@ -213,21 +175,48 @@ export const seleniumflexibleAction: Action = {
             const results: { [key: string]: any[] } = {};
 
             for (const dataType of dataTypes) {
-                const pattern = dataPatterns[dataType];
-                if (pattern) {
-                    results[dataType] = await crawlAndExtract(driver, websiteUrl, pattern);
+                let extractedData: any[];
+                 if (dataPatterns[dataType]) {
+                    const pattern = dataPatterns[dataType];
+                    extractedData = await crawlAndExtract(driver, websiteUrl, pattern);
+                } else {
+                    extractedData = await extractGenericData(runtime, driver, websiteUrl,dataType);
+                    // extractedData = await crawlAndExtract(driver, websiteUrl, dataPatterns.twitter);
                 }
+                 results[dataType] = extractedData;
             }
-
-            if (callback) {
-                callback({
-                    text: formatExtractedData(results),
-                    content: {
-                        websiteUrl,
-                        results
+            elizaLogger.log("back in seleniumflexibleAction");
+             try{
+             const response = formatExtractedData(results);
+             }
+             catch(error){
+                elizaLogger.log("error in formatExtractedData");
+                for(const dataType in results){
+                    for(const data of results[dataType]){
+                        elizaLogger.log("Extracted data :", data +"\n");
+                        callback({
+                            text:"info is: "+data,
+                        });
                     }
-                });
-            }
+                }
+                
+             }
+
+             
+             callback({
+                text: "successfully extracted data",
+                content: { action: "EXTRACT_DATA", content: { websiteUrl, results } }
+            });
+
+            // if (callback) {
+            //     callback({
+            //         text: formatExtractedData(results),
+            //         content: {
+            //             websiteUrl,
+            //             results
+            //         }
+            //     });
+            // }
 
             return true;
 
@@ -529,10 +518,10 @@ async function determineDataTypes(runtime: IAgentRuntime, text: string): Promise
     }
     elizaLogger.log("types", types);
 
-    // If no known patterns found, try to determine type from text
+   // If no known patterns found, try to determine type from text
     if (types.length === 0) {
         const prompt = `What type of data is being requested in: "${text}"? 
-                       Respond with a single word (e.g., email, phone, prices, etc.)`;
+                       Respond with a word or phrase (e.g., email, phone, prices,restaurant_name etc.)`;
         const dataType = await generateText({
             runtime: runtime,
             context: prompt,
@@ -540,14 +529,9 @@ async function determineDataTypes(runtime: IAgentRuntime, text: string): Promise
         });
         elizaLogger.log("dataType", dataType);
 
-        if (typeof dataType === 'string' && !dataPatterns[dataType]) {
-            const newPattern = await generateDataPattern(runtime, dataType);
-            if (newPattern) {
-                dataPatterns[dataType] = newPattern;
-                types.push(dataType);
-            }
-        }
+        types.push(dataType.trim());
     }
+
 
     return types;
 }
@@ -578,7 +562,16 @@ async function crawlAndExtract(driver: SeleniumWebDriver, baseUrl: string, patte
 
             // Find and interact with navigation elements with retry and refresh
             const interactiveElements = await driver.findElements(By.css(`
-                nav a, .nav-link, button:not([disabled]), [role="button"]
+                nav a, .nav-link, button:not([disabled]), [role="button"],
+                '.nav-item',
+                '[role="tab"]',
+                '.tab',
+                '.btn',
+                'li[onclick]',
+                'li[role="button"]',
+                '.clickable',
+                '[data-toggle]',
+                '[data-target]'
             `));
 
             for (const element of interactiveElements) {
@@ -848,4 +841,152 @@ function validateAndTransformPattern(pattern: any): DataPattern | null {
     }
 
     return pattern as DataPattern;
+}
+
+async function extractDataFromInteractiveElements(runtime: IAgentRuntime, driver: SeleniumWebDriver, websiteUrl: string, dataType: string): Promise<any[]> {
+    await driver.get(websiteUrl);
+    elizaLogger.log("inside extractDataFromInteractiveElements", dataType);
+    const results: any[] = [];
+     const interactiveElements = await driver.findElements(By.css(`
+        nav a, .nav-link, button:not([disabled]), [role="button"],
+        '.nav-item',
+        '[role="tab"]',
+        '.tab',
+        '.btn',
+        'li[onclick]',
+        'li[role="button"]',
+        '.clickable',
+        '[data-toggle]',
+        '[data-target]'
+    `));
+    
+    // 
+       // Extract data from each clickable interactive element
+   for (const element of interactiveElements) {
+    try {
+        // Verify element is still valid and visible
+        const isDisplayed = await retryOperation(async () => {
+            await driver.wait(until.elementIsVisible(element), 5000);
+            return await element.isDisplayed();
+        }, 3);
+         if (!isDisplayed) continue;
+         // Get current state
+        const beforeState = await driver.executeScript('return document.documentElement.outerHTML');
+         // Click with retry
+        await retryOperation(async () => {
+            await driver.executeScript('arguments[0].scrollIntoView(true)', element);
+            await driver.wait(until.elementIsVisible(element), 5000);
+            await element.click();
+        }, 3);
+         // Wait for any changes
+        await driver.sleep(1000);
+         // Check new state
+        const afterState = await driver.executeScript('return document.documentElement.outerHTML');
+        if (beforeState !== afterState) {
+            const pageSource = await driver.getPageSource();
+            const extractedInfo = await extractInfoFromSourceCode(runtime, pageSource, dataType);
+            if (extractedInfo) {
+                results.push(extractedInfo);
+            }
+        }
+         await driver.navigate().back();
+        await driver.wait(until.elementIsVisible(element), 5000);
+    } catch (error) {
+        elizaLogger.error(`Error extracting data from interactive element: ${error.message}`);
+    }
+}
+     return Array.from(new Set(results));
+} 
+
+async function extractGenericData(runtime: IAgentRuntime, driver: SeleniumWebDriver, websiteUrl: string, dataType: string): Promise<any[]> {
+    const results = new Set();
+    const visitedUrls = new Set([websiteUrl]);
+    const urlsToVisit = [websiteUrl];
+    var i=0;
+     while (urlsToVisit.length > 0 && i<3) {
+        const currentUrl = urlsToVisit.shift()!;
+        try {
+            elizaLogger.log("inside extractGenericData", currentUrl);
+            await driver.get(currentUrl);
+            // Wait for page load
+            await driver.wait(until.elementLocated(By.tagName('body')), 10000);
+             // Add wait for dynamic content
+            await driver.sleep(2000); // Wait for dynamic content to load
+             // Extract data from current page with retry mechanism
+            const pageResults = await retryOperation(
+                async () => extractInfoFromSourceCode(runtime, await driver.getPageSource(), dataType),
+                3,
+                1000,
+                driver
+            );
+            if (pageResults) {
+                results.add(pageResults);
+            }
+             // Find and interact with navigation elements with retry and refresh
+             const interactiveElements = await driver.findElements(By.xpath(`
+                //a | //button | //*[@role="button"] | //*[@onclick] | //*[@role="tab"] | //*[@data-toggle] | //*[@data-target]
+            `));
+            
+               // Find all href links on the current page
+           const links = await driver.findElements(By.css('a[href]'));
+        
+           for (const link of links) {
+            try {
+                const href = await link.getAttribute('href');
+                if (href && href.startsWith('https')) {
+                    const absoluteUrl = new URL(href, currentUrl).toString();
+                    if (!visitedUrls.has(absoluteUrl)) {
+                        visitedUrls.add(absoluteUrl);
+                        if (!urlsToVisit.includes(absoluteUrl)) {
+                            urlsToVisit.push(absoluteUrl);
+                        }
+                    }
+                }
+            } catch (error) {
+                elizaLogger.error('Error extracting href:', error.message);
+                continue; // Skip problematic links
+            }
+          }
+          i=i+1;
+            
+         } catch (error) {
+            elizaLogger.error('Error processing URL:', error.message);
+            elizaLogger.log("error", error);
+            continue; // Skip problematic URLs
+        }
+    }
+     return Array.from(results);
+}
+ 
+async function extractInfoFromSourceCode(runtime: IAgentRuntime, sourceCode: string, dataType: string): Promise<string | null> {
+    const prompt = `
+    As an AI assistant, your task is to extract specific information from the provided HTML source code. 
+    The type of information to extract is: ${dataType}.
+     Here are some guidelines to follow:
+    - Carefully analyze the HTML structure and content to identify the relevant information.
+    - Extract only the requested type of information and nothing else.
+    - make this top priority(If the requested information is not found in the source code, respond with only "Information not found".Dont respond with extra info).
+    - Provide only the relevant information in a concise and clear format you should start response with here is the information about ${dataType},dont include any insructions or useless info.
+     HTML Source Code:
+    ${sourceCode}
+     Extracted ${dataType}:
+    `;
+     const response = await generateText({
+        runtime: runtime,
+        context: prompt.slice(12000),
+        modelClass: ModelClass.LARGE
+    });
+     const extractedInfo = response.trim();
+    return extractedInfo !== "Information not found" ? extractedInfo : null;
+} 
+
+function extractNamesFromResponse(response: string): string[] {
+    const nameRegex = /\*\*([^*]+)\*\*/g;
+    const matches = response.match(nameRegex);
+    
+    if (matches) {
+        return matches.map(match => match.replace(/\*\*/g, ''));
+    }
+    
+    return [];
 }
