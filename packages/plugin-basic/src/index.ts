@@ -6,8 +6,8 @@ export * as actions from "./actions";
 export * as evaluators from "./evaluators";
 export * as providers from "./providers";
 
-export const basicPlugin: Plugin = {
-    name: "basic",
+export const seleniumPlugin: Plugin = {
+    name: "seleniumPlugin",
     description: "Agent bootstrap with basic actions and evaluators",
     actions: [
       helloWorldAction,
